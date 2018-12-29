@@ -1,0 +1,9 @@
+[package]
+name = "minesweeper"
+version = "0.1.0"
+authors = ["Nathan <nathan@mongodb.com>"]
+edition = "2018"
+
+[dependencies]
+ggez = "0.4"
+rand = "0.6"
