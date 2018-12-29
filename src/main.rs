@@ -42,22 +42,21 @@ impl Cell {
 
     fn calculate_rust_count(&mut self, board: &Vec<Vec<Cell>>) {
         let mut rusts_found = 0;
-        let is: Vec<i8> = vec![-1, 0, 1];
-        'outer: for i in &is {
-            for j in &is {
-                if self.position[0] == 0. && *i == -1
-                    || self.position[0] == BOARD_SIDE as f32 - 1. && *i == 1
+        'outer: for i in -1..=1 {
+            for j in -1..=1 {
+                if self.position[0] == 0. && i == -1
+                    || self.position[0] == BOARD_SIDE as f32 - 1. && i == 1
                 {
                     continue 'outer;
                 }
-                if self.position[1] == 0. && *j == -1
-                    || self.position[1] == BOARD_SIDE as f32 - 1. && *j == 1
+                if self.position[1] == 0. && j == -1
+                    || self.position[1] == BOARD_SIDE as f32 - 1. && j == 1
                 {
                     continue;
                 }
-                if *i != 0 || *j != 0 {
-                    if board[(self.position[0] as i8 + *i) as usize]
-                        [(self.position[1] as i8 + *j) as usize]
+                if i != 0 || j != 0 {
+                    if board[(self.position[0] as i8 + i) as usize]
+                        [(self.position[1] as i8 + j) as usize]
                         .is_rust
                     {
                         rusts_found += 1;
@@ -77,6 +76,7 @@ struct MainState {
     font: graphics::Font,
     game_over: Option<GameOverState>,
     did_sleep: bool,
+    did_reveal: bool,
 }
 
 impl MainState {
@@ -111,6 +111,7 @@ impl MainState {
             font,
             game_over: None,
             did_sleep: false,
+            did_reveal: false,
         })
     }
 }
@@ -119,9 +120,7 @@ fn flood_fill(board: &mut Vec<Vec<Cell>>, cell_x: usize, cell_y: usize, ignore_r
     let mut queue: VecDeque<Cell> = VecDeque::new();
     queue.push_front(board[cell_x][cell_y].clone());
 
-    let is: Vec<i8> = vec![-1, 0, 1];
-    while !queue.is_empty() {
-        let cell = queue.pop_front().unwrap();
+    while let Some(cell) = queue.pop_front() {
         if !cell.is_rust && !cell.is_flagged || ignore_rules {
             let (x, y) = (cell.position[0] as usize, cell.position[1] as usize);
             board[x][y].is_hidden = false;
@@ -129,52 +128,52 @@ fn flood_fill(board: &mut Vec<Vec<Cell>>, cell_x: usize, cell_y: usize, ignore_r
                 board[x][y].game_over = true;
                 board[x][y].is_flagged = false;
             }
-            'outer: for i in &is {
-                for j in &is {
-                    if cell.position[0] == 0. && *i == -1
-                        || cell.position[0] == BOARD_SIDE as f32 - 1. && *i == 1
+            'outer: for i in -1..=1 {
+                for j in -1..=1 {
+                    if cell.position[0] == 0. && i == -1
+                        || cell.position[0] == BOARD_SIDE as f32 - 1. && i == 1
                     {
                         continue 'outer;
                     }
-                    if cell.position[1] == 0. && *j == -1
-                        || cell.position[1] == BOARD_SIDE as f32 - 1. && *j == 1
+                    if cell.position[1] == 0. && j == -1
+                        || cell.position[1] == BOARD_SIDE as f32 - 1. && j == 1
                     {
                         continue;
                     }
-                    if *i != 0 || *j != 0 {
+                    if i != 0 || j != 0 {
                         if ignore_rules
-                            && !board[(cell.position[0] as i8 + *i) as usize]
-                                [(cell.position[1] as i8 + *j) as usize]
+                            && !board[(cell.position[0] as i8 + i) as usize]
+                                [(cell.position[1] as i8 + j) as usize]
                                 .game_over
                         {
-                            let new_cell = board[(cell.position[0] as i8 + *i) as usize]
-                                [(cell.position[1] as i8 + *j) as usize]
+                            let new_cell = board[(cell.position[0] as i8 + i) as usize]
+                                [(cell.position[1] as i8 + j) as usize]
                                 .clone();
                             queue.push_back(new_cell);
-                        } else if !board[(cell.position[0] as i8 + *i) as usize]
-                            [(cell.position[1] as i8 + *j) as usize]
+                        } else if !board[(cell.position[0] as i8 + i) as usize]
+                            [(cell.position[1] as i8 + j) as usize]
                             .is_flagged
-                            && board[(cell.position[0] as i8 + *i) as usize]
-                                [(cell.position[1] as i8 + *j) as usize]
+                            && board[(cell.position[0] as i8 + i) as usize]
+                                [(cell.position[1] as i8 + j) as usize]
                                 .rust_count
                                 == 0
-                            && board[(cell.position[0] as i8 + *i) as usize]
-                                [(cell.position[1] as i8 + *j) as usize]
+                            && board[(cell.position[0] as i8 + i) as usize]
+                                [(cell.position[1] as i8 + j) as usize]
                                 .is_hidden
                         {
-                            let new_cell = board[(cell.position[0] as i8 + *i) as usize]
-                                [(cell.position[1] as i8 + *j) as usize]
+                            let new_cell = board[(cell.position[0] as i8 + i) as usize]
+                                [(cell.position[1] as i8 + j) as usize]
                                 .clone();
                             queue.push_back(new_cell);
-                        } else if !board[(cell.position[0] as i8 + *i) as usize]
-                            [(cell.position[1] as i8 + *j) as usize]
+                        } else if !board[(cell.position[0] as i8 + i) as usize]
+                            [(cell.position[1] as i8 + j) as usize]
                             .is_flagged
-                            && !board[(cell.position[0] as i8 + *i) as usize]
-                                [(cell.position[1] as i8 + *j) as usize]
+                            && !board[(cell.position[0] as i8 + i) as usize]
+                                [(cell.position[1] as i8 + j) as usize]
                                 .is_rust
                         {
-                            board[(cell.position[0] as i8 + *i) as usize]
-                                [(cell.position[1] as i8 + *j) as usize]
+                            board[(cell.position[0] as i8 + i) as usize]
+                                [(cell.position[1] as i8 + j) as usize]
                                 .is_hidden = false;
                         }
                     }
@@ -229,7 +228,7 @@ impl event::EventHandler for MainState {
                 let mut correct = 0;
                 for i in 0..9 {
                     for j in 0..9 {
-                        let cell = &self.board[i][j];
+                        let cell = &self.board[i][j].clone();
                         if !cell.is_hidden && !cell.is_rust {
                             correct += 1;
                         }
@@ -252,8 +251,7 @@ impl event::EventHandler for MainState {
                                 cell.position[1] * SPACING + 1.,
                             );
                             graphics::draw(ctx, &self.image, dest_point, 0.)?;
-                        }
-                        // Drawing the border of every cell
+                        } // Drawing the border of every cell
                         graphics::set_color(ctx, graphics::BLACK)?;
                         graphics::rectangle(
                             ctx,
@@ -301,21 +299,33 @@ impl event::EventHandler for MainState {
                 }
             }
             Some(GameOverState::Solved) => {
-                if !self.did_sleep {
+                if !self.did_sleep && !self.did_reveal {
+                    self.did_reveal = true;
+                    for i in 0..9 {
+                        for j in 0..9 {
+                            if self.board[i][j].is_rust {
+                                let dest_point = graphics::Point2::new(
+                                    self.board[i][j].position[0] * SPACING + 1.,
+                                    self.board[i][j].position[1] * SPACING + 1.,
+                                );
+                                graphics::draw(ctx, &self.flag, dest_point, 0.)?;
+                            }
+                        }
+                    }
+                } else if !self.did_sleep {
                     let delay = time::Duration::from_secs(3);
                     thread::sleep(delay);
                     self.did_sleep = true;
+                } else {
+                    graphics::clear(ctx);
+                    graphics::set_color(ctx, graphics::WHITE)?;
+                    let text = graphics::Text::new(ctx, &"YOU WIN!", &self.font)?;
+                    let f_w = self.font.get_width(&"YOU WIN!") as f32;
+                    let f_h = self.font.get_height() as f32;
+                    let center =
+                        graphics::Point2::new(200.0 + (f_w / 2.0) - f_w, 180.0 + (f_h / 2.0) - f_h);
+                    graphics::draw(ctx, &text, center, 0.0)?;
                 }
-
-                graphics::clear(ctx);
-                graphics::set_color(ctx, graphics::WHITE)?;
-                let text = graphics::Text::new(ctx, &"YOU WIN!", &self.font)?;
-                let f_w = self.font.get_width(&"YOU WIN!") as f32;
-                let f_h = self.font.get_height() as f32;
-                let center =
-                    graphics::Point2::new(200.0 + (f_w / 2.0) - f_w, 200.0 + (f_h / 2.0) - f_h);
-                graphics::draw(ctx, &text, center, 0.0)?;
-                // something
             }
             Some(GameOverState::Failed) => {
                 if !self.did_sleep {
@@ -330,8 +340,13 @@ impl event::EventHandler for MainState {
                 let f_w = self.font.get_width(&"YOU LOSE!") as f32;
                 let f_h = self.font.get_height() as f32;
                 let center =
-                    graphics::Point2::new(200.0 + (f_w / 2.0) - f_w, 200.0 + (f_h / 2.0) - f_h);
+                    graphics::Point2::new(180.0 + (f_w / 2.0) - f_w, 180.0 + (f_h / 2.0) - f_h);
                 graphics::draw(ctx, &text, center, 0.0)?;
+                graphics::rectangle(
+                    ctx,
+                    graphics::DrawMode::Fill,
+                    graphics::Rect::new(90., 250., 180., 50.),
+                )?;
             }
         }
         // Drawables are drawn from their top-left corner.
@@ -355,8 +370,8 @@ impl event::EventHandler for MainState {
 // do the work of creating our MainState and running our game.
 // * Then, just call `game.run()` which runs the `Game` mainloop.
 pub fn main() {
-    let ctx = &mut ContextBuilder::new("minesweeper", "ggez")
-        .window_setup(WindowSetup::default().title("Rustsweeper"))
+    let ctx = &mut ContextBuilder::new("Rust Sweeper", "ggez")
+        .window_setup(WindowSetup::default().title("Rust Sweeper "))
         .window_mode(WindowMode::default().dimensions(360, 360))
         .build()
         .unwrap();
