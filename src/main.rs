@@ -7,11 +7,13 @@ use ggez::graphics::Point2;
 use ggez::{Context, ContextBuilder, GameResult};
 use rand::prelude::*;
 use std::collections::VecDeque;
-use std::{env, path, thread, time};
+use std::{env, path};
 
 const CELL_SIDE: f32 = 80.;
 const SPACING: f32 = 80.;
 const BOARD_SIDE: u8 = 9;
+const CTRL_PANEL_WIDTH: f32 = 350.;
+const PHI: f32 = 1.618;
 
 enum GameOverState {
     Solved,
@@ -79,6 +81,8 @@ struct MainState {
     did_sleep: bool,
     did_reveal: bool,
     first_click: bool,
+    reset_location: (f32, f32),
+    reset_dims: (f32, f32),
 }
 
 fn spawn_board() -> Vec<Vec<Cell>> {
@@ -110,6 +114,7 @@ impl MainState {
         let happy_image = graphics::Image::new(ctx, "/ferris_happy.resized.jpg").unwrap();
         let image = graphics::Image::new(ctx, "/cpp.resized.jpg").unwrap();
 
+        let dims = CELL_SIDE * BOARD_SIDE as f32;
         Ok(MainState {
             frames: 0,
             board: spawn_board(),
@@ -121,7 +126,17 @@ impl MainState {
             did_reveal: false,
             first_click: true,
             happy_image,
+            reset_location: (dims + 100., 100.),
+            reset_dims: (200., 200. / PHI),
         })
+    }
+
+    fn reset(&mut self) {
+        self.board = spawn_board();
+        self.game_over = None;
+        self.did_sleep = false;
+        self.did_reveal = false;
+        self.first_click = true;
     }
 }
 
@@ -205,6 +220,18 @@ impl event::EventHandler for MainState {
     fn mouse_button_down_event(&mut self, _ctx: &mut Context, button: MouseButton, x: i32, y: i32) {
         let cell_x = (x / CELL_SIDE as i32) as usize;
         let cell_y = (y / CELL_SIDE as i32) as usize;
+        if cell_x > (BOARD_SIDE - 1) as usize {
+            let click_x = x as f32 - self.reset_location.0;
+            let click_y = y as f32 - self.reset_location.1;
+            if click_x > 0.
+                && click_x < self.reset_dims.0
+                && click_y > 0.
+                && click_y < self.reset_dims.1
+            {
+                self.reset();
+            }
+            return;
+        }
         match button {
             MouseButton::Right => {
                 if self.board[cell_x][cell_y].is_hidden {
@@ -234,7 +261,6 @@ impl event::EventHandler for MainState {
                     flood_fill(&mut self.board, cell_x, cell_y, false);
                 } else if self.board[cell_x][cell_y].is_rust {
                     flood_fill(&mut self.board, cell_x, cell_y, true);
-                // something
                 } else {
                     self.board[cell_x][cell_y].is_hidden = false;
                 }
@@ -244,10 +270,58 @@ impl event::EventHandler for MainState {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx);
-        //graphics::set_color(ctx, graphics::Color::from((0, 0, 0, 255)))?;
+        graphics::set_background_color(ctx, graphics::Color::from_rgb(75, 27, 34));
+        let dims = CELL_SIDE * BOARD_SIDE as f32;
+        graphics::set_color(ctx, graphics::Color::from_rgb(21, 4, 12))?;
+        graphics::line(
+            ctx,
+            &[Point2::new(dims + 5., 0.), Point2::new(dims + 5., dims)],
+            10.,
+        )?;
+        graphics::rectangle(
+            ctx,
+            graphics::DrawMode::Fill,
+            graphics::Rect::new(
+                self.reset_location.0,
+                self.reset_location.1,
+                self.reset_dims.0,
+                self.reset_dims.1,
+            ),
+        )?;
+        graphics::set_color(ctx, graphics::WHITE)?;
+        let text = graphics::Text::new(ctx, &"RESET", &self.font)?;
+        let center =
+            graphics::Point2::new(self.reset_location.0 + 15., self.reset_location.1 + 20.);
+        graphics::draw(ctx, &text, center, 0.0)?;
+
         //graphics::draw(ctx, &self.image, Point2::new(400., 400.), 0.)?;
         match self.game_over {
-            None => {
+            Some(GameOverState::Solved) => {
+                for i in 0..9 {
+                    for j in 0..9 {
+                        if self.board[i][j].is_rust {
+                            let dest_point = graphics::Point2::new(
+                                self.board[i][j].position[0] * SPACING,
+                                self.board[i][j].position[1] * SPACING,
+                            );
+                            graphics::draw(ctx, &self.happy_image, dest_point, 0.)?;
+                        } else {
+                            let shown_num = if self.board[i][j].rust_count == 0 {
+                                "".to_owned()
+                            } else {
+                                format!("{}", self.board[i][j].rust_count)
+                            };
+                            let text = graphics::Text::new(ctx, &shown_num, &self.font)?;
+                            let center = graphics::Point2::new(
+                                self.board[i][j].position[0] * SPACING + 20.,
+                                self.board[i][j].position[1] * SPACING + 10.,
+                            );
+                            graphics::draw(ctx, &text, center, 0.0)?;
+                        }
+                    }
+                }
+            }
+            _ => {
                 let mut correct = 0;
                 for i in 0..BOARD_SIDE as usize {
                     for j in 0..BOARD_SIDE as usize {
@@ -317,68 +391,6 @@ impl event::EventHandler for MainState {
                     }
                 }
             }
-            Some(GameOverState::Solved) => {
-                if !self.did_sleep && !self.did_reveal {
-                    self.did_reveal = true;
-                    for i in 0..9 {
-                        for j in 0..9 {
-                            if self.board[i][j].is_rust {
-                                let dest_point = graphics::Point2::new(
-                                    self.board[i][j].position[0] * SPACING,
-                                    self.board[i][j].position[1] * SPACING,
-                                );
-                                graphics::draw(ctx, &self.happy_image, dest_point, 0.)?;
-                            } else {
-                                let shown_num = if self.board[i][j].rust_count == 0 {
-                                    "".to_owned()
-                                } else {
-                                    format!("{}", self.board[i][j].rust_count)
-                                };
-                                let text = graphics::Text::new(ctx, &shown_num, &self.font)?;
-                                let center = graphics::Point2::new(
-                                    self.board[i][j].position[0] * SPACING + 20.,
-                                    self.board[i][j].position[1] * SPACING + 10.,
-                                );
-                                graphics::draw(ctx, &text, center, 0.0)?;
-                            }
-                        }
-                    }
-                } else if !self.did_sleep {
-                    let delay = time::Duration::from_secs(3);
-                    thread::sleep(delay);
-                    self.did_sleep = true;
-                } else {
-                    graphics::clear(ctx);
-                    graphics::set_color(ctx, graphics::WHITE)?;
-                    let text = graphics::Text::new(ctx, &"YOU WIN!", &self.font)?;
-                    let f_w = self.font.get_width(&"YOU WIN!") as f32;
-                    let f_h = self.font.get_height() as f32;
-                    let center =
-                        graphics::Point2::new(200.0 + (f_w / 2.0) - f_w, 180.0 + (f_h / 2.0) - f_h);
-                    graphics::draw(ctx, &text, center, 0.0)?;
-                }
-            }
-            Some(GameOverState::Failed) => {
-                if !self.did_sleep {
-                    let delay = time::Duration::from_secs(3);
-                    thread::sleep(delay);
-                    self.did_sleep = true;
-                }
-
-                graphics::clear(ctx);
-                graphics::set_color(ctx, graphics::WHITE)?;
-                let text = graphics::Text::new(ctx, &"YOU LOSE!", &self.font)?;
-                let f_w = self.font.get_width(&"YOU LOSE!") as f32;
-                let f_h = self.font.get_height() as f32;
-                let center =
-                    graphics::Point2::new(180.0 + (f_w / 2.0) - f_w, 180.0 + (f_h / 2.0) - f_h);
-                graphics::draw(ctx, &text, center, 0.0)?;
-                graphics::rectangle(
-                    ctx,
-                    graphics::DrawMode::Fill,
-                    graphics::Rect::new(90., 250., 180., 50.),
-                )?;
-            }
         }
         // Drawables are drawn from their top-left corner.
         graphics::present(ctx);
@@ -404,7 +416,7 @@ pub fn main() {
     let ctx = &mut ContextBuilder::new("Rust Sweeper", "ggez")
         .window_setup(WindowSetup::default().title("Rust Sweeper "))
         .window_mode(WindowMode::default().dimensions(
-            (CELL_SIDE * BOARD_SIDE as f32) as u32,
+            (CELL_SIDE * BOARD_SIDE as f32 + CTRL_PANEL_WIDTH) as u32,
             (CELL_SIDE * BOARD_SIDE as f32) as u32,
         ))
         .build()
