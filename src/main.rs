@@ -9,8 +9,8 @@ use rand::prelude::*;
 use std::collections::VecDeque;
 use std::{env, path, thread, time};
 
-const CELL_SIDE: f32 = 39.5;
-const SPACING: f32 = 40.;
+const CELL_SIDE: f32 = 80.;
+const SPACING: f32 = 80.;
 const BOARD_SIDE: u8 = 9;
 
 enum GameOverState {
@@ -74,44 +74,53 @@ struct MainState {
     image: graphics::Image,
     flag: graphics::Image,
     font: graphics::Font,
+    happy_image: graphics::Image,
     game_over: Option<GameOverState>,
     did_sleep: bool,
     did_reveal: bool,
+    first_click: bool,
+}
+
+fn spawn_board() -> Vec<Vec<Cell>> {
+    let mut rng = rand::thread_rng();
+    let mut starting_states: Vec<bool> = (0..=81).map(|n| n % 9 == 0).collect();
+    starting_states.shuffle(&mut rng);
+    let mut board = vec![];
+    for i in 0..9 {
+        let mut inner = vec![];
+        for j in 0..9 {
+            let cell = Cell::new(Point2::new(i as f32, j as f32), starting_states[i * 9 + j]);
+            inner.push(cell);
+        }
+        board.push(inner);
+    }
+    let tmp_board = board.clone();
+    for i in 0..9 {
+        for j in 0..9 {
+            board[i][j].calculate_rust_count(&tmp_board);
+        }
+    }
+    board
 }
 
 impl MainState {
     pub fn new(ctx: &mut Context) -> GameResult<MainState> {
-        let mut rng = rand::thread_rng();
-        let mut starting_states: Vec<bool> = (0..82).map(|n| n % 9 == 0).collect();
-        starting_states.shuffle(&mut rng);
-        let mut board = vec![];
-        let image = graphics::Image::new(ctx, "/cpp.resized.jpg").unwrap();
         let flag = graphics::Image::new(ctx, "/nope_square.resized.jpg").unwrap();
-        let font = graphics::Font::new(ctx, "/DejaVuSerif.ttf", 16)?;
+        let font = graphics::Font::new(ctx, "/FiraCode-Bold.ttf", 30)?;
+        let happy_image = graphics::Image::new(ctx, "/ferris_happy.resized.jpg").unwrap();
+        let image = graphics::Image::new(ctx, "/cpp.resized.jpg").unwrap();
 
-        for i in 0..9 {
-            let mut inner = vec![];
-            for j in 0..9 {
-                let cell = Cell::new(Point2::new(i as f32, j as f32), starting_states[i * 9 + j]);
-                inner.push(cell);
-            }
-            board.push(inner);
-        }
-        let tmp_board = board.clone();
-        for i in 0..9 {
-            for j in 0..9 {
-                board[i][j].calculate_rust_count(&tmp_board);
-            }
-        }
         Ok(MainState {
             frames: 0,
-            board,
+            board: spawn_board(),
             image,
             flag,
             font,
             game_over: None,
             did_sleep: false,
             did_reveal: false,
+            first_click: true,
+            happy_image,
         })
     }
 }
@@ -194,8 +203,8 @@ impl event::EventHandler for MainState {
     }
 
     fn mouse_button_down_event(&mut self, _ctx: &mut Context, button: MouseButton, x: i32, y: i32) {
-        let cell_x = (x / 40) as usize;
-        let cell_y = (y / 40) as usize;
+        let cell_x = (x / CELL_SIDE as i32) as usize;
+        let cell_y = (y / CELL_SIDE as i32) as usize;
         match button {
             MouseButton::Right => {
                 if self.board[cell_x][cell_y].is_hidden {
@@ -203,6 +212,20 @@ impl event::EventHandler for MainState {
                 }
             }
             _ => {
+                // user should never encounter a bomb on the first click
+                if self.first_click {
+                    if self.board[cell_x][cell_y].is_rust {
+                        let mut clicked_bomb = true;
+                        while clicked_bomb {
+                            self.board = spawn_board();
+                            if !self.board[cell_x][cell_y].is_rust {
+                                clicked_bomb = false;
+                                self.first_click = false;
+                            }
+                        }
+                    }
+                    self.first_click = false;
+                }
                 if self.board[cell_x][cell_y].is_flagged {
                     return;
                 }
@@ -226,9 +249,9 @@ impl event::EventHandler for MainState {
         match self.game_over {
             None => {
                 let mut correct = 0;
-                for i in 0..9 {
-                    for j in 0..9 {
-                        let cell = &self.board[i][j].clone();
+                for i in 0..BOARD_SIDE as usize {
+                    for j in 0..BOARD_SIDE as usize {
+                        let cell = &self.board[i][j];
                         if !cell.is_hidden && !cell.is_rust {
                             correct += 1;
                         }
@@ -241,14 +264,14 @@ impl event::EventHandler for MainState {
                         }
                         if cell.is_flagged {
                             let dest_point = graphics::Point2::new(
-                                cell.position[0] * SPACING + 1.,
-                                cell.position[1] * SPACING + 1.,
+                                cell.position[0] * SPACING,
+                                cell.position[1] * SPACING,
                             );
                             graphics::draw(ctx, &self.flag, dest_point, 0.)?;
                         } else if !cell.is_hidden && cell.is_rust {
                             let dest_point = graphics::Point2::new(
-                                cell.position[0] * SPACING + 1.,
-                                cell.position[1] * SPACING + 1.,
+                                cell.position[0] * SPACING,
+                                cell.position[1] * SPACING,
                             );
                             graphics::draw(ctx, &self.image, dest_point, 0.)?;
                         } // Drawing the border of every cell
@@ -273,15 +296,11 @@ impl event::EventHandler for MainState {
                                 format!("{}", cell.rust_count)
                             };
                             let text = graphics::Text::new(ctx, &shown_num, &self.font)?;
-                            graphics::draw(
-                                ctx,
-                                &text,
-                                Point2::new(
-                                    cell.position[0] * SPACING + 4.,
-                                    cell.position[1] * SPACING + 2.,
-                                ),
-                                0.,
-                            )?;
+                            let center = graphics::Point2::new(
+                                cell.position[0] * SPACING + 20.,
+                                cell.position[1] * SPACING + 10.,
+                            );
+                            graphics::draw(ctx, &text, center, 0.0)?;
                         }
                         if cell.is_hidden && !cell.is_flagged {
                             graphics::rectangle(
@@ -305,10 +324,22 @@ impl event::EventHandler for MainState {
                         for j in 0..9 {
                             if self.board[i][j].is_rust {
                                 let dest_point = graphics::Point2::new(
-                                    self.board[i][j].position[0] * SPACING + 1.,
-                                    self.board[i][j].position[1] * SPACING + 1.,
+                                    self.board[i][j].position[0] * SPACING,
+                                    self.board[i][j].position[1] * SPACING,
                                 );
-                                graphics::draw(ctx, &self.flag, dest_point, 0.)?;
+                                graphics::draw(ctx, &self.happy_image, dest_point, 0.)?;
+                            } else {
+                                let shown_num = if self.board[i][j].rust_count == 0 {
+                                    "".to_owned()
+                                } else {
+                                    format!("{}", self.board[i][j].rust_count)
+                                };
+                                let text = graphics::Text::new(ctx, &shown_num, &self.font)?;
+                                let center = graphics::Point2::new(
+                                    self.board[i][j].position[0] * SPACING + 20.,
+                                    self.board[i][j].position[1] * SPACING + 10.,
+                                );
+                                graphics::draw(ctx, &text, center, 0.0)?;
                             }
                         }
                     }
@@ -372,7 +403,10 @@ impl event::EventHandler for MainState {
 pub fn main() {
     let ctx = &mut ContextBuilder::new("Rust Sweeper", "ggez")
         .window_setup(WindowSetup::default().title("Rust Sweeper "))
-        .window_mode(WindowMode::default().dimensions(360, 360))
+        .window_mode(WindowMode::default().dimensions(
+            (CELL_SIDE * BOARD_SIDE as f32) as u32,
+            (CELL_SIDE * BOARD_SIDE as f32) as u32,
+        ))
         .build()
         .unwrap();
 
