@@ -299,8 +299,10 @@ impl event::EventHandler for MainState {
         graphics::rectangle(ctx, graphics::DrawMode::Fill, self.reset_button)?;
         graphics::set_color(ctx, graphics::WHITE)?;
         let text = graphics::Text::new(ctx, &"RESET", &self.font)?;
+        let f_w = text.width() as f32;
+        let f_h = text.height() as f32;
         let center =
-            graphics::Point2::new(self.reset_location.0 + 15., self.reset_location.1 + 20.);
+            graphics::Point2::new(self.reset_location.0 + (self.reset_button.w / 2. - f_w / 2.), self.reset_location.1 + (self.reset_button.h / 2. - f_h / 2.));
         graphics::draw(ctx, &text, center, 0.0)?;
 
         match self.game_over {
