@@ -3,7 +3,7 @@
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::event::{self, MouseButton};
 use ggez::graphics;
-use ggez::graphics::Point2;
+use ggez::graphics::{Mesh, Point2};
 use ggez::{Context, ContextBuilder, GameResult};
 use rand::prelude::*;
 use std::collections::VecDeque;
@@ -82,7 +82,8 @@ struct MainState {
     did_reveal: bool,
     first_click: bool,
     reset_location: (f32, f32),
-    reset_dims: (f32, f32),
+    reset_button: graphics::Rect,
+    mesh: Mesh,
 }
 
 fn spawn_board() -> Vec<Vec<Cell>> {
@@ -115,6 +116,27 @@ impl MainState {
         let image = graphics::Image::new(ctx, "/cpp.resized.jpg").unwrap();
 
         let dims = CELL_SIDE * BOARD_SIDE as f32;
+        let reset_button = graphics::Rect::new(dims + 100., 100., 200., 200. / PHI);
+
+        let mut mb = graphics::MeshBuilder::new();
+        for i in 0..BOARD_SIDE {
+            for j in 0..BOARD_SIDE {
+                let x1 = i as f32 * CELL_SIDE as f32;
+                let x2 = i as f32 * CELL_SIDE as f32 + CELL_SIDE;
+                let y1 = j as f32 * CELL_SIDE as f32;
+                let y2 = j as f32 * CELL_SIDE as f32 + CELL_SIDE;
+                let lines = vec![
+                    Point2::new(x1, y1),
+                    Point2::new(x2, y1),
+                    Point2::new(x2, y2),
+                    Point2::new(x1, y2),
+                ];
+                mb.polygon(graphics::DrawMode::Line(1.0), &lines);
+            }
+        }
+
+        let mesh = mb.build(ctx).unwrap();
+
         Ok(MainState {
             frames: 0,
             board: spawn_board(),
@@ -127,7 +149,8 @@ impl MainState {
             first_click: true,
             happy_image,
             reset_location: (dims + 100., 100.),
-            reset_dims: (200., 200. / PHI),
+            reset_button,
+            mesh,
         })
     }
 
@@ -218,16 +241,11 @@ impl event::EventHandler for MainState {
     }
 
     fn mouse_button_down_event(&mut self, _ctx: &mut Context, button: MouseButton, x: i32, y: i32) {
+        let click_point = Point2::new(x as f32, y as f32);
         let cell_x = (x / CELL_SIDE as i32) as usize;
         let cell_y = (y / CELL_SIDE as i32) as usize;
         if cell_x > (BOARD_SIDE - 1) as usize {
-            let click_x = x as f32 - self.reset_location.0;
-            let click_y = y as f32 - self.reset_location.1;
-            if click_x > 0.
-                && click_x < self.reset_dims.0
-                && click_y > 0.
-                && click_y < self.reset_dims.1
-            {
+            if self.reset_button.contains(click_point) {
                 self.reset();
             }
             return;
@@ -278,25 +296,19 @@ impl event::EventHandler for MainState {
             &[Point2::new(dims + 5., 0.), Point2::new(dims + 5., dims)],
             10.,
         )?;
-        graphics::rectangle(
-            ctx,
-            graphics::DrawMode::Fill,
-            graphics::Rect::new(
-                self.reset_location.0,
-                self.reset_location.1,
-                self.reset_dims.0,
-                self.reset_dims.1,
-            ),
-        )?;
+        graphics::rectangle(ctx, graphics::DrawMode::Fill, self.reset_button)?;
         graphics::set_color(ctx, graphics::WHITE)?;
         let text = graphics::Text::new(ctx, &"RESET", &self.font)?;
         let center =
             graphics::Point2::new(self.reset_location.0 + 15., self.reset_location.1 + 20.);
         graphics::draw(ctx, &text, center, 0.0)?;
 
-        //graphics::draw(ctx, &self.image, Point2::new(400., 400.), 0.)?;
         match self.game_over {
             Some(GameOverState::Solved) => {
+                graphics::set_color(ctx, graphics::BLACK)?;
+                graphics::draw(ctx, &self.mesh, Point2::new(0., 0.), 0.).unwrap();
+                graphics::set_color(ctx, graphics::WHITE)?;
+
                 for i in 0..9 {
                     for j in 0..9 {
                         if self.board[i][j].is_rust {
@@ -306,15 +318,19 @@ impl event::EventHandler for MainState {
                             );
                             graphics::draw(ctx, &self.happy_image, dest_point, 0.)?;
                         } else {
-                            let shown_num = if self.board[i][j].rust_count == 0 {
+                            // self.draw_text(ctx);
+                            let cell = &self.board[i][j];
+                            let shown_num = if cell.rust_count == 0 {
                                 "".to_owned()
                             } else {
-                                format!("{}", self.board[i][j].rust_count)
+                                format!("{}", cell.rust_count)
                             };
                             let text = graphics::Text::new(ctx, &shown_num, &self.font)?;
+                            let f_w = text.width() as f32;
+                            let f_h = text.height() as f32;
                             let center = graphics::Point2::new(
-                                self.board[i][j].position[0] * SPACING + 20.,
-                                self.board[i][j].position[1] * SPACING + 10.,
+                                cell.position[0] * SPACING + (SPACING / 2. - f_w / 2.),
+                                cell.position[1] * SPACING + (SPACING / 2. - f_h / 2.),
                             );
                             graphics::draw(ctx, &text, center, 0.0)?;
                         }
@@ -348,41 +364,38 @@ impl event::EventHandler for MainState {
                                 cell.position[1] * SPACING,
                             );
                             graphics::draw(ctx, &self.image, dest_point, 0.)?;
-                        } // Drawing the border of every cell
+                        }
+                        // Drawing the border of every cell
                         graphics::set_color(ctx, graphics::BLACK)?;
-                        graphics::rectangle(
-                            ctx,
-                            graphics::DrawMode::Line(1.),
-                            graphics::Rect::new(
-                                cell.position[0] * SPACING,
-                                cell.position[1] * SPACING,
-                                CELL_SIDE,
-                                CELL_SIDE,
-                            ),
-                        )?;
-                        // The color must be set back to white to get the images to show up as expected
-                        graphics::set_color(ctx, graphics::WHITE)?;
+                        graphics::draw(ctx, &self.mesh, Point2::new(0., 0.), 0.).unwrap();
 
-                        if !cell.is_rust && !cell.is_flagged {
+                        graphics::set_color(ctx, graphics::WHITE)?;
+                        if !cell.is_rust && (!cell.is_flagged || !cell.is_hidden) {
+                            // self.draw_text(ctx);
+                            let cell = &self.board[i][j];
                             let shown_num = if cell.rust_count == 0 {
                                 "".to_owned()
                             } else {
                                 format!("{}", cell.rust_count)
                             };
                             let text = graphics::Text::new(ctx, &shown_num, &self.font)?;
+                            let f_w = text.width() as f32;
+                            let f_h = text.height() as f32;
                             let center = graphics::Point2::new(
-                                cell.position[0] * SPACING + 20.,
-                                cell.position[1] * SPACING + 10.,
+                                cell.position[0] * SPACING + (SPACING / 2. - f_w / 2.),
+                                cell.position[1] * SPACING + (SPACING / 2. - f_h / 2.),
                             );
                             graphics::draw(ctx, &text, center, 0.0)?;
                         }
+
+                        // drawing the cell cover if the cell is hidden
                         if cell.is_hidden && !cell.is_flagged {
                             graphics::rectangle(
                                 ctx,
                                 graphics::DrawMode::Fill,
                                 graphics::Rect::new(
-                                    cell.position[0] * SPACING,
-                                    cell.position[1] * SPACING,
+                                    cell.position[0] * SPACING + 1.,
+                                    cell.position[1] * SPACING + 1.,
                                     CELL_SIDE - 2.,
                                     CELL_SIDE - 2.,
                                 ),
@@ -392,7 +405,7 @@ impl event::EventHandler for MainState {
                 }
             }
         }
-        // Drawables are drawn from their top-left corner.
+        // Drawable items are drawn from their top-left corner.
         graphics::present(ctx);
 
         self.frames += 1;
