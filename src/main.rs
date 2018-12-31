@@ -46,19 +46,19 @@ impl Cell {
         let mut rusts_found = 0;
         'outer: for i in -1..=1 {
             for j in -1..=1 {
-                if self.position[0] == 0. && i == -1
-                    || self.position[0] == BOARD_SIDE as f32 - 1. && i == 1
+                if self.position.x == 0. && i == -1
+                    || self.position.x == BOARD_SIDE as f32 - 1. && i == 1
                 {
                     continue 'outer;
                 }
-                if self.position[1] == 0. && j == -1
-                    || self.position[1] == BOARD_SIDE as f32 - 1. && j == 1
+                if self.position.y == 0. && j == -1
+                    || self.position.y == BOARD_SIDE as f32 - 1. && j == 1
                 {
                     continue;
                 }
                 if i != 0 || j != 0 {
-                    if board[(self.position[0] as i8 + i) as usize]
-                        [(self.position[1] as i8 + j) as usize]
+                    if board[(self.position.x as i8 + i) as usize]
+                        [(self.position.y as i8 + j) as usize]
                         .is_rust
                     {
                         rusts_found += 1;
@@ -169,7 +169,7 @@ fn flood_fill(board: &mut Vec<Vec<Cell>>, cell_x: usize, cell_y: usize, ignore_r
 
     while let Some(cell) = queue.pop_front() {
         if !cell.is_rust && !cell.is_flagged || ignore_rules {
-            let (x, y) = (cell.position[0] as usize, cell.position[1] as usize);
+            let (x, y) = (cell.position.x as usize, cell.position.y as usize);
             board[x][y].is_hidden = false;
             if ignore_rules {
                 board[x][y].game_over = true;
@@ -177,50 +177,50 @@ fn flood_fill(board: &mut Vec<Vec<Cell>>, cell_x: usize, cell_y: usize, ignore_r
             }
             'outer: for i in -1..=1 {
                 for j in -1..=1 {
-                    if cell.position[0] == 0. && i == -1
-                        || cell.position[0] == BOARD_SIDE as f32 - 1. && i == 1
+                    if cell.position.x == 0. && i == -1
+                        || cell.position.x == BOARD_SIDE as f32 - 1. && i == 1
                     {
                         continue 'outer;
                     }
-                    if cell.position[1] == 0. && j == -1
-                        || cell.position[1] == BOARD_SIDE as f32 - 1. && j == 1
+                    if cell.position.y == 0. && j == -1
+                        || cell.position.y == BOARD_SIDE as f32 - 1. && j == 1
                     {
                         continue;
                     }
                     if i != 0 || j != 0 {
                         if ignore_rules
-                            && !board[(cell.position[0] as i8 + i) as usize]
-                                [(cell.position[1] as i8 + j) as usize]
+                            && !board[(cell.position.x as i8 + i) as usize]
+                                [(cell.position.y as i8 + j) as usize]
                                 .game_over
                         {
-                            let new_cell = board[(cell.position[0] as i8 + i) as usize]
-                                [(cell.position[1] as i8 + j) as usize]
+                            let new_cell = board[(cell.position.x as i8 + i) as usize]
+                                [(cell.position.y as i8 + j) as usize]
                                 .clone();
                             queue.push_back(new_cell);
-                        } else if !board[(cell.position[0] as i8 + i) as usize]
-                            [(cell.position[1] as i8 + j) as usize]
+                        } else if !board[(cell.position.x as i8 + i) as usize]
+                            [(cell.position.y as i8 + j) as usize]
                             .is_flagged
-                            && board[(cell.position[0] as i8 + i) as usize]
-                                [(cell.position[1] as i8 + j) as usize]
+                            && board[(cell.position.x as i8 + i) as usize]
+                                [(cell.position.y as i8 + j) as usize]
                                 .rust_count
                                 == 0
-                            && board[(cell.position[0] as i8 + i) as usize]
-                                [(cell.position[1] as i8 + j) as usize]
+                            && board[(cell.position.x as i8 + i) as usize]
+                                [(cell.position.y as i8 + j) as usize]
                                 .is_hidden
                         {
-                            let new_cell = board[(cell.position[0] as i8 + i) as usize]
-                                [(cell.position[1] as i8 + j) as usize]
+                            let new_cell = board[(cell.position.x as i8 + i) as usize]
+                                [(cell.position.y as i8 + j) as usize]
                                 .clone();
                             queue.push_back(new_cell);
-                        } else if !board[(cell.position[0] as i8 + i) as usize]
-                            [(cell.position[1] as i8 + j) as usize]
+                        } else if !board[(cell.position.x as i8 + i) as usize]
+                            [(cell.position.y as i8 + j) as usize]
                             .is_flagged
-                            && !board[(cell.position[0] as i8 + i) as usize]
-                                [(cell.position[1] as i8 + j) as usize]
+                            && !board[(cell.position.x as i8 + i) as usize]
+                                [(cell.position.y as i8 + j) as usize]
                                 .is_rust
                         {
-                            board[(cell.position[0] as i8 + i) as usize]
-                                [(cell.position[1] as i8 + j) as usize]
+                            board[(cell.position.x as i8 + i) as usize]
+                                [(cell.position.y as i8 + j) as usize]
                                 .is_hidden = false;
                         }
                     }
@@ -301,8 +301,10 @@ impl event::EventHandler for MainState {
         let text = graphics::Text::new(ctx, &"RESET", &self.font)?;
         let f_w = text.width() as f32;
         let f_h = text.height() as f32;
-        let center =
-            graphics::Point2::new(self.reset_location.0 + (self.reset_button.w / 2. - f_w / 2.), self.reset_location.1 + (self.reset_button.h / 2. - f_h / 2.));
+        let center = graphics::Point2::new(
+            self.reset_location.0 + (self.reset_button.w / 2. - f_w / 2.),
+            self.reset_location.1 + (self.reset_button.h / 2. - f_h / 2.),
+        );
         graphics::draw(ctx, &text, center, 0.0)?;
 
         match self.game_over {
@@ -315,8 +317,8 @@ impl event::EventHandler for MainState {
                     for j in 0..9 {
                         if self.board[i][j].is_rust {
                             let dest_point = graphics::Point2::new(
-                                self.board[i][j].position[0] * SPACING,
-                                self.board[i][j].position[1] * SPACING,
+                                self.board[i][j].position.x * SPACING,
+                                self.board[i][j].position.y * SPACING,
                             );
                             graphics::draw(ctx, &self.happy_image, dest_point, 0.)?;
                         } else {
@@ -331,8 +333,8 @@ impl event::EventHandler for MainState {
                             let f_w = text.width() as f32;
                             let f_h = text.height() as f32;
                             let center = graphics::Point2::new(
-                                cell.position[0] * SPACING + (SPACING / 2. - f_w / 2.),
-                                cell.position[1] * SPACING + (SPACING / 2. - f_h / 2.),
+                                cell.position.x * SPACING + (SPACING / 2. - f_w / 2.),
+                                cell.position.y * SPACING + (SPACING / 2. - f_h / 2.),
                             );
                             graphics::draw(ctx, &text, center, 0.0)?;
                         }
@@ -356,14 +358,14 @@ impl event::EventHandler for MainState {
                         }
                         if cell.is_flagged {
                             let dest_point = graphics::Point2::new(
-                                cell.position[0] * SPACING,
-                                cell.position[1] * SPACING,
+                                cell.position.x * SPACING,
+                                cell.position.y * SPACING,
                             );
                             graphics::draw(ctx, &self.flag, dest_point, 0.)?;
                         } else if !cell.is_hidden && cell.is_rust {
                             let dest_point = graphics::Point2::new(
-                                cell.position[0] * SPACING,
-                                cell.position[1] * SPACING,
+                                cell.position.x * SPACING,
+                                cell.position.y * SPACING,
                             );
                             graphics::draw(ctx, &self.image, dest_point, 0.)?;
                         }
@@ -384,8 +386,8 @@ impl event::EventHandler for MainState {
                             let f_w = text.width() as f32;
                             let f_h = text.height() as f32;
                             let center = graphics::Point2::new(
-                                cell.position[0] * SPACING + (SPACING / 2. - f_w / 2.),
-                                cell.position[1] * SPACING + (SPACING / 2. - f_h / 2.),
+                                cell.position.x * SPACING + (SPACING / 2. - f_w / 2.),
+                                cell.position.y * SPACING + (SPACING / 2. - f_h / 2.),
                             );
                             graphics::draw(ctx, &text, center, 0.0)?;
                         }
@@ -396,8 +398,8 @@ impl event::EventHandler for MainState {
                                 ctx,
                                 graphics::DrawMode::Fill,
                                 graphics::Rect::new(
-                                    cell.position[0] * SPACING + 1.,
-                                    cell.position[1] * SPACING + 1.,
+                                    cell.position.x * SPACING + 1.,
+                                    cell.position.y * SPACING + 1.,
                                     CELL_SIDE - 2.,
                                     CELL_SIDE - 2.,
                                 ),
