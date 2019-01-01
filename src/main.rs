@@ -9,11 +9,10 @@ use rand::prelude::*;
 use std::collections::VecDeque;
 use std::{env, path};
 
-const CELL_SIDE: f32 = 80.;
-const SPACING: f32 = 80.;
-const BOARD_SIDE: u8 = 9;
-const CTRL_PANEL_WIDTH: f32 = 350.;
-const PHI: f32 = 1.618;
+const DEFAULT_CELL_DIMS: f32 = 80.0;
+const DEFAULT_CELLS_ROW: u8 = 9;
+const CTRL_PANEL_WIDTH: f32 = 350.0;
+const PHI: f32 = 1.0618;
 
 enum GameOverState {
     Solved,
@@ -28,6 +27,7 @@ struct Cell {
     is_hidden: bool,
     game_over: bool,
     is_flagged: bool,
+    scaling: f32,
 }
 
 impl Cell {
@@ -39,6 +39,7 @@ impl Cell {
             is_hidden: true,
             game_over: false,
             is_flagged: false,
+            scaling: 0.0,
         }
     }
 
@@ -46,13 +47,13 @@ impl Cell {
         let mut rusts_found = 0;
         'outer: for i in -1..=1 {
             for j in -1..=1 {
-                if self.position.x == 0. && i == -1
-                    || self.position.x == BOARD_SIDE as f32 - 1. && i == 1
+                if self.position.x == 0.0 && i == -1
+                    || self.position.x == DEFAULT_CELLS_ROW as f32 - 1.0 && i == 1
                 {
                     continue 'outer;
                 }
-                if self.position.y == 0. && j == -1
-                    || self.position.y == BOARD_SIDE as f32 - 1. && j == 1
+                if self.position.y == 0.0 && j == -1
+                    || self.position.y == DEFAULT_CELLS_ROW as f32 - 1.0 && j == 1
                 {
                     continue;
                 }
@@ -115,16 +116,16 @@ impl MainState {
         let happy_image = graphics::Image::new(ctx, "/ferris_happy.resized.jpg").unwrap();
         let image = graphics::Image::new(ctx, "/cpp.resized.jpg").unwrap();
 
-        let dims = CELL_SIDE * BOARD_SIDE as f32;
-        let reset_button = graphics::Rect::new(dims + 100., 100., 200., 200. / PHI);
+        let dims = DEFAULT_CELL_DIMS * DEFAULT_CELLS_ROW as f32;
+        let reset_button = graphics::Rect::new(dims + 100.0, 100.0, 200.0, 200.0 / PHI);
 
         let mut mb = graphics::MeshBuilder::new();
-        for i in 0..BOARD_SIDE {
-            for j in 0..BOARD_SIDE {
-                let x1 = i as f32 * CELL_SIDE as f32;
-                let x2 = i as f32 * CELL_SIDE as f32 + CELL_SIDE;
-                let y1 = j as f32 * CELL_SIDE as f32;
-                let y2 = j as f32 * CELL_SIDE as f32 + CELL_SIDE;
+        for i in 0..DEFAULT_CELLS_ROW {
+            for j in 0..DEFAULT_CELLS_ROW {
+                let x1 = i as f32 * DEFAULT_CELL_DIMS as f32;
+                let x2 = i as f32 * DEFAULT_CELL_DIMS as f32 + DEFAULT_CELL_DIMS;
+                let y1 = j as f32 * DEFAULT_CELL_DIMS as f32;
+                let y2 = j as f32 * DEFAULT_CELL_DIMS as f32 + DEFAULT_CELL_DIMS;
                 let lines = vec![
                     Point2::new(x1, y1),
                     Point2::new(x2, y1),
@@ -148,7 +149,7 @@ impl MainState {
             did_reveal: false,
             first_click: true,
             happy_image,
-            reset_location: (dims + 100., 100.),
+            reset_location: (dims + 100.0, 100.0),
             reset_button,
             mesh,
         })
@@ -163,6 +164,9 @@ impl MainState {
     }
 }
 
+/// if ignore_rules is true (in the event a bomb was clicked on), flood fill
+/// actually performs a flood fill. Otherwise
+/// this implements standard minesweeper rules
 fn flood_fill(board: &mut Vec<Vec<Cell>>, cell_x: usize, cell_y: usize, ignore_rules: bool) {
     let mut queue: VecDeque<Cell> = VecDeque::new();
     queue.push_front(board[cell_x][cell_y].clone());
@@ -177,13 +181,13 @@ fn flood_fill(board: &mut Vec<Vec<Cell>>, cell_x: usize, cell_y: usize, ignore_r
             }
             'outer: for i in -1..=1 {
                 for j in -1..=1 {
-                    if cell.position.x == 0. && i == -1
-                        || cell.position.x == BOARD_SIDE as f32 - 1. && i == 1
+                    if cell.position.x == 0.0 && i == -1
+                        || cell.position.x == DEFAULT_CELLS_ROW as f32 - 1.0 && i == 1
                     {
                         continue 'outer;
                     }
-                    if cell.position.y == 0. && j == -1
-                        || cell.position.y == BOARD_SIDE as f32 - 1. && j == 1
+                    if cell.position.y == 0.0 && j == -1
+                        || cell.position.y == DEFAULT_CELLS_ROW as f32 - 1.0 && j == 1
                     {
                         continue;
                     }
@@ -242,9 +246,9 @@ impl event::EventHandler for MainState {
 
     fn mouse_button_down_event(&mut self, _ctx: &mut Context, button: MouseButton, x: i32, y: i32) {
         let click_point = Point2::new(x as f32, y as f32);
-        let cell_x = (x / CELL_SIDE as i32) as usize;
-        let cell_y = (y / CELL_SIDE as i32) as usize;
-        if cell_x > (BOARD_SIDE - 1) as usize {
+        let cell_x = (x / DEFAULT_CELL_DIMS as i32) as usize;
+        let cell_y = (y / DEFAULT_CELL_DIMS as i32) as usize;
+        if cell_x > (DEFAULT_CELLS_ROW - 1) as usize {
             if self.reset_button.contains(click_point) {
                 self.reset();
             }
@@ -271,12 +275,15 @@ impl event::EventHandler for MainState {
                     }
                     self.first_click = false;
                 }
+                // ignore clicks on flagged cells
                 if self.board[cell_x][cell_y].is_flagged {
                     return;
                 }
+                // if count is 0, trigger flood fill following rules
                 if self.board[cell_x][cell_y].rust_count == 0 && !self.board[cell_x][cell_y].is_rust
                 {
                     flood_fill(&mut self.board, cell_x, cell_y, false);
+                // if this is a bomb, trigger flood fill ignoring rules (true flood fill)
                 } else if self.board[cell_x][cell_y].is_rust {
                     flood_fill(&mut self.board, cell_x, cell_y, true);
                 } else {
@@ -289,12 +296,12 @@ impl event::EventHandler for MainState {
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx);
         graphics::set_background_color(ctx, graphics::Color::from_rgb(75, 27, 34));
-        let dims = CELL_SIDE * BOARD_SIDE as f32;
+        let dims = DEFAULT_CELL_DIMS * DEFAULT_CELLS_ROW as f32;
         graphics::set_color(ctx, graphics::Color::from_rgb(21, 4, 12))?;
         graphics::line(
             ctx,
-            &[Point2::new(dims + 5., 0.), Point2::new(dims + 5., dims)],
-            10.,
+            &[Point2::new(dims + 5.0, 0.0), Point2::new(dims + 5.0, dims)],
+            10.0,
         )?;
         graphics::rectangle(ctx, graphics::DrawMode::Fill, self.reset_button)?;
         graphics::set_color(ctx, graphics::WHITE)?;
@@ -302,25 +309,25 @@ impl event::EventHandler for MainState {
         let f_w = text.width() as f32;
         let f_h = text.height() as f32;
         let center = graphics::Point2::new(
-            self.reset_location.0 + (self.reset_button.w / 2. - f_w / 2.),
-            self.reset_location.1 + (self.reset_button.h / 2. - f_h / 2.),
+            self.reset_location.0 + (self.reset_button.w / 2.0 - f_w / 2.0),
+            self.reset_location.1 + (self.reset_button.h / 2.0 - f_h / 2.0),
         );
         graphics::draw(ctx, &text, center, 0.0)?;
 
         match self.game_over {
             Some(GameOverState::Solved) => {
                 graphics::set_color(ctx, graphics::BLACK)?;
-                graphics::draw(ctx, &self.mesh, Point2::new(0., 0.), 0.).unwrap();
+                graphics::draw(ctx, &self.mesh, Point2::new(0.0, 0.0), 0.0).unwrap();
                 graphics::set_color(ctx, graphics::WHITE)?;
 
                 for i in 0..9 {
                     for j in 0..9 {
                         if self.board[i][j].is_rust {
                             let dest_point = graphics::Point2::new(
-                                self.board[i][j].position.x * SPACING,
-                                self.board[i][j].position.y * SPACING,
+                                self.board[i][j].position.x * DEFAULT_CELL_DIMS,
+                                self.board[i][j].position.y * DEFAULT_CELL_DIMS,
                             );
-                            graphics::draw(ctx, &self.happy_image, dest_point, 0.)?;
+                            graphics::draw(ctx, &self.happy_image, dest_point, 0.0)?;
                         } else {
                             // self.draw_text(ctx);
                             let cell = &self.board[i][j];
@@ -333,8 +340,10 @@ impl event::EventHandler for MainState {
                             let f_w = text.width() as f32;
                             let f_h = text.height() as f32;
                             let center = graphics::Point2::new(
-                                cell.position.x * SPACING + (SPACING / 2. - f_w / 2.),
-                                cell.position.y * SPACING + (SPACING / 2. - f_h / 2.),
+                                cell.position.x * DEFAULT_CELL_DIMS
+                                    + (DEFAULT_CELL_DIMS / 2.0 - f_w / 2.0),
+                                cell.position.y * DEFAULT_CELL_DIMS
+                                    + (DEFAULT_CELL_DIMS / 2.0 - f_h / 2.0),
                             );
                             graphics::draw(ctx, &text, center, 0.0)?;
                         }
@@ -343,8 +352,8 @@ impl event::EventHandler for MainState {
             }
             _ => {
                 let mut correct = 0;
-                for i in 0..BOARD_SIDE as usize {
-                    for j in 0..BOARD_SIDE as usize {
+                for i in 0..DEFAULT_CELLS_ROW as usize {
+                    for j in 0..DEFAULT_CELLS_ROW as usize {
                         let cell = &self.board[i][j];
                         if !cell.is_hidden && !cell.is_rust {
                             correct += 1;
@@ -358,20 +367,20 @@ impl event::EventHandler for MainState {
                         }
                         if cell.is_flagged {
                             let dest_point = graphics::Point2::new(
-                                cell.position.x * SPACING,
-                                cell.position.y * SPACING,
+                                cell.position.x * DEFAULT_CELL_DIMS,
+                                cell.position.y * DEFAULT_CELL_DIMS,
                             );
-                            graphics::draw(ctx, &self.flag, dest_point, 0.)?;
+                            graphics::draw(ctx, &self.flag, dest_point, 0.0)?;
                         } else if !cell.is_hidden && cell.is_rust {
                             let dest_point = graphics::Point2::new(
-                                cell.position.x * SPACING,
-                                cell.position.y * SPACING,
+                                cell.position.x * DEFAULT_CELL_DIMS,
+                                cell.position.y * DEFAULT_CELL_DIMS,
                             );
-                            graphics::draw(ctx, &self.image, dest_point, 0.)?;
+                            graphics::draw(ctx, &self.image, dest_point, 0.0)?;
                         }
                         // Drawing the border of every cell
                         graphics::set_color(ctx, graphics::BLACK)?;
-                        graphics::draw(ctx, &self.mesh, Point2::new(0., 0.), 0.).unwrap();
+                        graphics::draw(ctx, &self.mesh, Point2::new(0.0, 0.0), 0.0).unwrap();
 
                         graphics::set_color(ctx, graphics::WHITE)?;
                         if !cell.is_rust && (!cell.is_flagged || !cell.is_hidden) {
@@ -386,8 +395,10 @@ impl event::EventHandler for MainState {
                             let f_w = text.width() as f32;
                             let f_h = text.height() as f32;
                             let center = graphics::Point2::new(
-                                cell.position.x * SPACING + (SPACING / 2. - f_w / 2.),
-                                cell.position.y * SPACING + (SPACING / 2. - f_h / 2.),
+                                cell.position.x * DEFAULT_CELL_DIMS
+                                    + (DEFAULT_CELL_DIMS / 2.0 - f_w / 2.0),
+                                cell.position.y * DEFAULT_CELL_DIMS
+                                    + (DEFAULT_CELL_DIMS / 2.0 - f_h / 2.0),
                             );
                             graphics::draw(ctx, &text, center, 0.0)?;
                         }
@@ -398,10 +409,10 @@ impl event::EventHandler for MainState {
                                 ctx,
                                 graphics::DrawMode::Fill,
                                 graphics::Rect::new(
-                                    cell.position.x * SPACING + 1.,
-                                    cell.position.y * SPACING + 1.,
-                                    CELL_SIDE - 2.,
-                                    CELL_SIDE - 2.,
+                                    cell.position.x * DEFAULT_CELL_DIMS + 1.0,
+                                    cell.position.y * DEFAULT_CELL_DIMS + 1.0,
+                                    DEFAULT_CELL_DIMS - 2.0,
+                                    DEFAULT_CELL_DIMS - 2.0,
                                 ),
                             )?;
                         }
@@ -433,8 +444,8 @@ pub fn main() {
     let ctx = &mut ContextBuilder::new("Rust Sweeper", "ggez")
         .window_setup(WindowSetup::default().title("Rust Sweeper "))
         .window_mode(WindowMode::default().dimensions(
-            (CELL_SIDE * BOARD_SIDE as f32 + CTRL_PANEL_WIDTH) as u32,
-            (CELL_SIDE * BOARD_SIDE as f32) as u32,
+            (DEFAULT_CELL_DIMS * DEFAULT_CELLS_ROW as f32 + CTRL_PANEL_WIDTH) as u32,
+            (DEFAULT_CELL_DIMS * DEFAULT_CELLS_ROW as f32) as u32,
         ))
         .build()
         .unwrap();
