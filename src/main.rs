@@ -213,8 +213,6 @@ impl event::EventHandler for MainState {
                 {
                     self.board.flood_fill(cell_x, cell_y);
                 // if this is a bomb, trigger flood fill ignoring rules (true flood fill)
-                } else if self.board.cells[cell_x][cell_y].is_rust {
-                    self.board.flood_fill(cell_x, cell_y);
                 } else {
                     self.board.cells[cell_x][cell_y].is_hidden = false;
                 }
