@@ -1,5 +1,3 @@
-//! Basic hello world example.
-
 use ggez::conf::{WindowMode, WindowSetup};
 use ggez::event::{self, MouseButton};
 use ggez::graphics;
@@ -25,7 +23,7 @@ enum GameOverState {
 
 // First we make a structure to contain the game's state
 struct MainState {
-    frames: usize,
+    // frames: usize,
     board: Board,
     image: graphics::Image,
     flag: graphics::Image,
@@ -83,7 +81,7 @@ impl MainState {
         board.calculate_rust_count();
 
         Ok(MainState {
-            frames: 0,
+            // frames: 0,
             board,
             image,
             flag,
@@ -183,7 +181,6 @@ impl event::EventHandler for MainState {
             }
             return;
         }
-        println!("{}, {}, {}", self.difficulty.1, cell_x, cell_y);
         match button {
             MouseButton::Right => {
                 if self.board.cells[cell_x][cell_y].is_hidden {
@@ -436,26 +433,17 @@ impl event::EventHandler for MainState {
                 }
             }
         }
-        // Drawable items are drawn from their top-left corner.
         graphics::present(ctx);
 
-        self.frames += 1;
-        if (self.frames % 100) == 0 {
-            println!("FPS: {}", ggez::timer::get_fps(ctx));
-        }
+        // self.frames += 1;
+        // if (self.frames % 100) == 0 {
+        //     println!("FPS: {}", ggez::timer::get_fps(ctx));
+        // }
 
         Ok(())
     }
 }
 
-// Now our main function, which does three things:
-//
-// * First, create a new `ggez::conf::Conf`
-// object which contains configuration info on things such
-// as screen resolution and window title.
-// * Second, create a `ggez::game::Game` object which will
-// do the work of creating our MainState and running our game.
-// * Then, just call `game.run()` which runs the `Game` mainloop.
 pub fn main() {
     let ctx = &mut ContextBuilder::new("Rust Sweeper", "ggez")
         .window_setup(WindowSetup::default().title("Rust Sweeper "))
