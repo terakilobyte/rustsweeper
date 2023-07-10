@@ -5,5 +5,5 @@ authors = ["Nathan <nathan@mongodb.com>"]
 edition = "2018"
 
 [dependencies]
-ggez = "0.5"
+ggez = "0.9"
 rand = "0.8"
